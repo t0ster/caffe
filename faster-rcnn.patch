@@ -1,0 +1,1219 @@
+diff --git a/LICENSE b/LICENSE
+index 0c99adc18..a8449337c 100644
+--- a/LICENSE
++++ b/LICENSE
+@@ -1,4 +1,4 @@
+-COPYRIGHT
++--------------------------START OF THIRD PARTY NOTICE--------------------------
+ 
+ All contributions by the University of California:
+ Copyright (c) 2014-2017 The Regents of the University of California (Regents)
+@@ -8,37 +8,57 @@ All other contributions:
+ Copyright (c) 2014-2017, the respective contributors
+ All rights reserved.
+ 
+-Caffe uses a shared copyright model: each contributor holds copyright over
+-their contributions to Caffe. The project versioning records all such
+-contribution and copyright details. If a contributor wants to further mark
+-their specific copyright on a particular contribution, they should indicate
+-their copyright solely in the commit message of the change when it is
+-committed.
++BSD License
+ 
+-LICENSE
++All rights reserved.
+ 
+ Redistribution and use in source and binary forms, with or without
+-modification, are permitted provided that the following conditions are met: 
+-
+-1. Redistributions of source code must retain the above copyright notice, this
+-   list of conditions and the following disclaimer. 
+-2. Redistributions in binary form must reproduce the above copyright notice,
+-   this list of conditions and the following disclaimer in the documentation
+-   and/or other materials provided with the distribution. 
+-
+-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++modification, are permitted provided that the following conditions
++are met:
++
++Redistributions of source code must retain the above copyright notice,
++this list of conditions and the following disclaimer.
++
++Redistributions in binary form must reproduce the above copyright notice,
++this list of conditions and the following disclaimer in the documentation
++and/or other materials provided with the distribution.
++
++THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++*AS IS* AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
++TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
++PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
++NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-CONTRIBUTION AGREEMENT
++---------------------------END OF THIRD PARTY NOTICE---------------------------
++
++Fast R-CNN
++
++Copyright (c) Microsoft Corporation
++
++All rights reserved.
++
++MIT License
++
++Permission is hereby granted, free of charge, to any person obtaining a
++copy of this software and associated documentation files (the "Software"),
++to deal in the Software without restriction, including without limitation
++the rights to use, copy, modify, merge, publish, distribute, sublicense,
++and/or sell copies of the Software, and to permit persons to whom the
++Software is furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included
++in all copies or substantial portions of the Software.
+ 
+-By contributing to the BVLC/caffe repository through pull-request, comment,
+-or otherwise, the contributor releases their content to the
+-license and copyright terms herein.
++THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
++THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
++OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
++ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/include/caffe/fast_rcnn_layers.hpp b/include/caffe/fast_rcnn_layers.hpp
+new file mode 100644
+index 000000000..81d6d5b81
+--- /dev/null
++++ b/include/caffe/fast_rcnn_layers.hpp
+@@ -0,0 +1,104 @@
++// ------------------------------------------------------------------
++// Fast R-CNN
++// Copyright (c) 2015 Microsoft
++// Licensed under The MIT License [see fast-rcnn/LICENSE for details]
++// Written by Ross Girshick
++// ------------------------------------------------------------------
++
++#ifndef CAFFE_FAST_RCNN_LAYERS_HPP_
++#define CAFFE_FAST_RCNN_LAYERS_HPP_
++
++#include <vector>
++
++#include "caffe/blob.hpp"
++#include "caffe/common.hpp"
++#include "caffe/layer.hpp"
++#include "caffe/proto/caffe.pb.h"
++
++#include "caffe/layers/loss_layer.hpp"
++
++namespace caffe {
++
++/* ROIPoolingLayer - Region of Interest Pooling Layer
++*/
++template <typename Dtype>
++class ROIPoolingLayer : public Layer<Dtype> {
++ public:
++  explicit ROIPoolingLayer(const LayerParameter& param)
++      : Layer<Dtype>(param) {}
++  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++
++  virtual inline const char* type() const { return "ROIPooling"; }
++
++  virtual inline int MinBottomBlobs() const { return 2; }
++  virtual inline int MaxBottomBlobs() const { return 2; }
++  virtual inline int MinTopBlobs() const { return 1; }
++  virtual inline int MaxTopBlobs() const { return 1; }
++
++ protected:
++  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
++      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
++  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
++      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
++
++  int channels_;
++  int height_;
++  int width_;
++  int pooled_height_;
++  int pooled_width_;
++  Dtype spatial_scale_;
++  Blob<int> max_idx_;
++};
++
++template <typename Dtype>
++class SmoothL1LossLayer : public LossLayer<Dtype> {
++ public:
++  explicit SmoothL1LossLayer(const LayerParameter& param)
++      : LossLayer<Dtype>(param), diff_() {}
++  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++
++  virtual inline const char* type() const { return "SmoothL1Loss"; }
++
++  virtual inline int ExactNumBottomBlobs() const { return -1; }
++  virtual inline int MinBottomBlobs() const { return 2; }
++  virtual inline int MaxBottomBlobs() const { return 4; }
++
++  /**
++   * Unlike most loss layers, in the SmoothL1LossLayer we can backpropagate
++   * to both inputs -- override to return true and always allow force_backward.
++   */
++  virtual inline bool AllowForceBackward(const int bottom_index) const {
++    return true;
++  }
++
++ protected:
++  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++
++  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
++      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
++  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
++      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
++
++  Blob<Dtype> diff_;
++  Blob<Dtype> errors_;
++  Blob<Dtype> ones_;
++  bool has_weights_;
++  Dtype sigma2_;
++};
++
++}  // namespace caffe
++
++#endif  // CAFFE_FAST_RCNN_LAYERS_HPP_
+diff --git a/include/caffe/layer.hpp b/include/caffe/layer.hpp
+index 30dbfd537..ac508342d 100644
+--- a/include/caffe/layer.hpp
++++ b/include/caffe/layer.hpp
+@@ -291,6 +291,7 @@ class Layer {
+     param_propagate_down_[param_id] = value;
+   }
+ 
++  inline Phase phase() { return phase_; }
+ 
+  protected:
+   /** The protobuf that stores the layer parameters */
+diff --git a/include/caffe/layers/dropout_layer.hpp b/include/caffe/layers/dropout_layer.hpp
+index e83143bc3..fc19a3921 100644
+--- a/include/caffe/layers/dropout_layer.hpp
++++ b/include/caffe/layers/dropout_layer.hpp
+@@ -73,6 +73,7 @@ class DropoutLayer : public NeuronLayer<Dtype> {
+   /// the scale for undropped inputs at train time @f$ 1 / (1 - p) @f$
+   Dtype scale_;
+   unsigned int uint_thres_;
++  bool scale_train_;
+ };
+ 
+ }  // namespace caffe
+diff --git a/include/caffe/layers/python_layer.hpp b/include/caffe/layers/python_layer.hpp
+index 1407d9217..2d984d677 100644
+--- a/include/caffe/layers/python_layer.hpp
++++ b/include/caffe/layers/python_layer.hpp
+@@ -26,7 +26,6 @@ class PythonLayer : public Layer<Dtype> {
+     }
+     self_.attr("param_str") = bp::str(
+         this->layer_param_.python_param().param_str());
+-    self_.attr("phase") = static_cast<int>(this->phase_);
+     self_.attr("setup")(bottom, top);
+   }
+   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+diff --git a/python/caffe/__init__.py b/python/caffe/__init__.py
+index 776945eec..fe5e46540 100644
+--- a/python/caffe/__init__.py
++++ b/python/caffe/__init__.py
+@@ -1,5 +1,31 @@
+-from .pycaffe import Net, SGDSolver, NesterovSolver, AdaGradSolver, RMSPropSolver, AdaDeltaSolver, AdamSolver, NCCL, Timer
+-from ._caffe import init_log, log, set_mode_cpu, set_mode_gpu, set_device, Layer, get_solver, layer_type_list, set_random_seed, solver_count, set_solver_count, solver_rank, set_solver_rank, set_multiprocess, has_nccl
++from .pycaffe import (
++    Net,
++    SGDSolver,
++    NesterovSolver,
++    AdaGradSolver,
++    RMSPropSolver,
++    AdaDeltaSolver,
++    AdamSolver,
++    NCCL,
++    Timer,
++)
++from ._caffe import (
++    init_log,
++    log,
++    set_mode_cpu,
++    set_mode_gpu,
++    set_device,
++    Layer,
++    get_solver,
++    layer_type_list,
++    set_random_seed,
++    solver_count,
++    set_solver_count,
++    solver_rank,
++    set_solver_rank,
++    set_multiprocess,
++    has_nccl,
++)
+ from ._caffe import __version__
+ from .proto.caffe_pb2 import TRAIN, TEST
+ from .classifier import Classifier
+diff --git a/python/caffe/_caffe.cpp b/python/caffe/_caffe.cpp
+index 82bf21e6e..067fec7d4 100644
+--- a/python/caffe/_caffe.cpp
++++ b/python/caffe/_caffe.cpp
+@@ -7,6 +7,7 @@
+ #include <boost/python.hpp>
+ #include <boost/python/raw_function.hpp>
+ #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
++#include <boost/python/enum.hpp>
+ #include <numpy/arrayobject.h>
+ 
+ // these need to be included after boost on OS X
+@@ -402,6 +403,11 @@ BOOST_PYTHON_MODULE(_caffe) {
+ 
+   bp::def("layer_type_list", &LayerRegistry<Dtype>::LayerTypeList);
+ 
++  bp::enum_<Phase>("Phase")
++    .value("TRAIN", caffe::TRAIN)
++    .value("TEST", caffe::TEST)
++    .export_values();
++
+   bp::class_<Net<Dtype>, shared_ptr<Net<Dtype> >, boost::noncopyable >("Net",
+     bp::no_init)
+     // Constructor
+@@ -484,6 +490,7 @@ BOOST_PYTHON_MODULE(_caffe) {
+           bp::return_internal_reference<>()))
+     .def("setup", &Layer<Dtype>::LayerSetUp)
+     .def("reshape", &Layer<Dtype>::Reshape)
++    .add_property("phase", bp::make_function(&Layer<Dtype>::phase))
+     .add_property("type", bp::make_function(&Layer<Dtype>::type));
+   BP_REGISTER_SHARED_PTR_TO_PYTHON(Layer<Dtype>);
+ 
+diff --git a/src/caffe/layers/dropout_layer.cpp b/src/caffe/layers/dropout_layer.cpp
+index 533ab26c0..fb80f1eb6 100644
+--- a/src/caffe/layers/dropout_layer.cpp
++++ b/src/caffe/layers/dropout_layer.cpp
+@@ -16,6 +16,7 @@ void DropoutLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+   DCHECK(threshold_ < 1.);
+   scale_ = 1. / (1. - threshold_);
+   uint_thres_ = static_cast<unsigned int>(UINT_MAX * threshold_);
++  scale_train_ = this->layer_param_.dropout_param().scale_train();
+ }
+ 
+ template <typename Dtype>
+@@ -37,11 +38,20 @@ void DropoutLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+   if (this->phase_ == TRAIN) {
+     // Create random numbers
+     caffe_rng_bernoulli(count, 1. - threshold_, mask);
+-    for (int i = 0; i < count; ++i) {
+-      top_data[i] = bottom_data[i] * mask[i] * scale_;
++    if (scale_train_) {
++      for (int i = 0; i < count; ++i) {
++        top_data[i] = bottom_data[i] * mask[i] * scale_;
++      }
++    } else {
++      for (int i = 0; i < count; ++i) {
++        top_data[i] = bottom_data[i] * mask[i];
++      }
+     }
+   } else {
+     caffe_copy(bottom[0]->count(), bottom_data, top_data);
++    if (!scale_train_) {
++      caffe_scal<Dtype>(  count, 1. / scale_, top_data);
++    }
+   }
+ }
+ 
+@@ -55,11 +65,20 @@ void DropoutLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+     if (this->phase_ == TRAIN) {
+       const unsigned int* mask = rand_vec_.cpu_data();
+       const int count = bottom[0]->count();
+-      for (int i = 0; i < count; ++i) {
+-        bottom_diff[i] = top_diff[i] * mask[i] * scale_;
++      if (scale_train_) {
++        for (int i = 0; i < count; ++i) {
++          bottom_diff[i] = top_diff[i] * mask[i] * scale_;
++        }
++      } else {
++        for (int i = 0; i < count; ++i) {
++          bottom_diff[i] = top_diff[i] * mask[i];
++        }
+       }
+     } else {
+       caffe_copy(top[0]->count(), top_diff, bottom_diff);
++      if (!scale_train_) {
++        caffe_scal<Dtype>(top[0]->count(), 1. / scale_, bottom_diff);
++      }
+     }
+   }
+ }
+diff --git a/src/caffe/layers/dropout_layer.cu b/src/caffe/layers/dropout_layer.cu
+index 186c10ca4..54afbe6c4 100644
+--- a/src/caffe/layers/dropout_layer.cu
++++ b/src/caffe/layers/dropout_layer.cu
+@@ -26,11 +26,19 @@ void DropoutLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+     caffe_gpu_rng_uniform(count, mask);
+     // set thresholds
+     // NOLINT_NEXT_LINE(whitespace/operators)
+-    DropoutForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+-        count, bottom_data, mask, uint_thres_, scale_, top_data);
++    if (scale_train_) {
++      DropoutForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++          count, bottom_data, mask, uint_thres_, scale_, top_data);
++    } else {
++      DropoutForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++          count, bottom_data, mask, uint_thres_, 1.f, top_data);
++    }
+     CUDA_POST_KERNEL_CHECK;
+   } else {
+     caffe_copy(count, bottom_data, top_data);
++    if (!scale_train_) {
++      caffe_gpu_scal<Dtype>(count, 1. / scale_, top_data);
++    }
+   }
+ }
+ 
+@@ -55,12 +63,19 @@ void DropoutLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
+           static_cast<const unsigned int*>(rand_vec_.gpu_data());
+       const int count = bottom[0]->count();
+       // NOLINT_NEXT_LINE(whitespace/operators)
+-      DropoutBackward<Dtype><<<CAFFE_GET_BLOCKS(count),
+-        CAFFE_CUDA_NUM_THREADS>>>(
+-          count, top_diff, mask, uint_thres_, scale_, bottom_diff);
++      if (scale_train_) {
++        DropoutBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++            count, top_diff, mask, uint_thres_, scale_, bottom_diff);
++      } else {
++        DropoutBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++            count, top_diff, mask, uint_thres_, 1.f, bottom_diff);
++      }
+       CUDA_POST_KERNEL_CHECK;
+     } else {
+       caffe_copy(top[0]->count(), top_diff, bottom_diff);
++      if (!scale_train_) {
++        caffe_gpu_scal<Dtype>(top[0]->count(), 1. / scale_, bottom_diff);
++      }
+     }
+   }
+ }
+diff --git a/src/caffe/layers/roi_pooling_layer.cpp b/src/caffe/layers/roi_pooling_layer.cpp
+new file mode 100644
+index 000000000..d25951946
+--- /dev/null
++++ b/src/caffe/layers/roi_pooling_layer.cpp
+@@ -0,0 +1,141 @@
++// ------------------------------------------------------------------
++// Fast R-CNN
++// Copyright (c) 2015 Microsoft
++// Licensed under The MIT License [see fast-rcnn/LICENSE for details]
++// Written by Ross Girshick
++// ------------------------------------------------------------------
++
++#include <cfloat>
++
++#include "caffe/fast_rcnn_layers.hpp"
++
++using std::max;
++using std::min;
++using std::floor;
++using std::ceil;
++
++namespace caffe {
++
++template <typename Dtype>
++void ROIPoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top) {
++  ROIPoolingParameter roi_pool_param = this->layer_param_.roi_pooling_param();
++  CHECK_GT(roi_pool_param.pooled_h(), 0)
++      << "pooled_h must be > 0";
++  CHECK_GT(roi_pool_param.pooled_w(), 0)
++      << "pooled_w must be > 0";
++  pooled_height_ = roi_pool_param.pooled_h();
++  pooled_width_ = roi_pool_param.pooled_w();
++  spatial_scale_ = roi_pool_param.spatial_scale();
++  LOG(INFO) << "Spatial scale: " << spatial_scale_;
++}
++
++template <typename Dtype>
++void ROIPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top) {
++  channels_ = bottom[0]->channels();
++  height_ = bottom[0]->height();
++  width_ = bottom[0]->width();
++  top[0]->Reshape(bottom[1]->num(), channels_, pooled_height_,
++      pooled_width_);
++  max_idx_.Reshape(bottom[1]->num(), channels_, pooled_height_,
++      pooled_width_);
++}
++
++template <typename Dtype>
++void ROIPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top) {
++  const Dtype* bottom_data = bottom[0]->cpu_data();
++  const Dtype* bottom_rois = bottom[1]->cpu_data();
++  // Number of ROIs
++  int num_rois = bottom[1]->num();
++  int batch_size = bottom[0]->num();
++  int top_count = top[0]->count();
++  Dtype* top_data = top[0]->mutable_cpu_data();
++  caffe_set(top_count, Dtype(-FLT_MAX), top_data);
++  int* argmax_data = max_idx_.mutable_cpu_data();
++  caffe_set(top_count, -1, argmax_data);
++
++  // For each ROI R = [batch_index x1 y1 x2 y2]: max pool over R
++  for (int n = 0; n < num_rois; ++n) {
++    int roi_batch_ind = bottom_rois[0];
++    int roi_start_w = round(bottom_rois[1] * spatial_scale_);
++    int roi_start_h = round(bottom_rois[2] * spatial_scale_);
++    int roi_end_w = round(bottom_rois[3] * spatial_scale_);
++    int roi_end_h = round(bottom_rois[4] * spatial_scale_);
++    CHECK_GE(roi_batch_ind, 0);
++    CHECK_LT(roi_batch_ind, batch_size);
++
++    int roi_height = max(roi_end_h - roi_start_h + 1, 1);
++    int roi_width = max(roi_end_w - roi_start_w + 1, 1);
++    const Dtype bin_size_h = static_cast<Dtype>(roi_height)
++                             / static_cast<Dtype>(pooled_height_);
++    const Dtype bin_size_w = static_cast<Dtype>(roi_width)
++                             / static_cast<Dtype>(pooled_width_);
++
++    const Dtype* batch_data = bottom_data + bottom[0]->offset(roi_batch_ind);
++
++    for (int c = 0; c < channels_; ++c) {
++      for (int ph = 0; ph < pooled_height_; ++ph) {
++        for (int pw = 0; pw < pooled_width_; ++pw) {
++          // Compute pooling region for this output unit:
++          //  start (included) = floor(ph * roi_height / pooled_height_)
++          //  end (excluded) = ceil((ph + 1) * roi_height / pooled_height_)
++          int hstart = static_cast<int>(floor(static_cast<Dtype>(ph)
++                                              * bin_size_h));
++          int wstart = static_cast<int>(floor(static_cast<Dtype>(pw)
++                                              * bin_size_w));
++          int hend = static_cast<int>(ceil(static_cast<Dtype>(ph + 1)
++                                           * bin_size_h));
++          int wend = static_cast<int>(ceil(static_cast<Dtype>(pw + 1)
++                                           * bin_size_w));
++
++          hstart = min(max(hstart + roi_start_h, 0), height_);
++          hend = min(max(hend + roi_start_h, 0), height_);
++          wstart = min(max(wstart + roi_start_w, 0), width_);
++          wend = min(max(wend + roi_start_w, 0), width_);
++
++          bool is_empty = (hend <= hstart) || (wend <= wstart);
++
++          const int pool_index = ph * pooled_width_ + pw;
++          if (is_empty) {
++            top_data[pool_index] = 0;
++            argmax_data[pool_index] = -1;
++          }
++
++          for (int h = hstart; h < hend; ++h) {
++            for (int w = wstart; w < wend; ++w) {
++              const int index = h * width_ + w;
++              if (batch_data[index] > top_data[pool_index]) {
++                top_data[pool_index] = batch_data[index];
++                argmax_data[pool_index] = index;
++              }
++            }
++          }
++        }
++      }
++      // Increment all data pointers by one channel
++      batch_data += bottom[0]->offset(0, 1);
++      top_data += top[0]->offset(0, 1);
++      argmax_data += max_idx_.offset(0, 1);
++    }
++    // Increment ROI data pointer
++    bottom_rois += bottom[1]->offset(1);
++  }
++}
++
++template <typename Dtype>
++void ROIPoolingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
++      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
++  NOT_IMPLEMENTED;
++}
++
++
++#ifdef CPU_ONLY
++STUB_GPU(ROIPoolingLayer);
++#endif
++
++INSTANTIATE_CLASS(ROIPoolingLayer);
++REGISTER_LAYER_CLASS(ROIPooling);
++
++}  // namespace caffe
+diff --git a/src/caffe/layers/roi_pooling_layer.cu b/src/caffe/layers/roi_pooling_layer.cu
+new file mode 100644
+index 000000000..2c42ccea0
+--- /dev/null
++++ b/src/caffe/layers/roi_pooling_layer.cu
+@@ -0,0 +1,188 @@
++// ------------------------------------------------------------------
++// Fast R-CNN
++// Copyright (c) 2015 Microsoft
++// Licensed under The MIT License [see fast-rcnn/LICENSE for details]
++// Written by Ross Girshick
++// ------------------------------------------------------------------
++
++#include <cfloat>
++
++#include "caffe/fast_rcnn_layers.hpp"
++
++using std::max;
++using std::min;
++
++namespace caffe {
++
++template <typename Dtype>
++__global__ void ROIPoolForward(const int nthreads, const Dtype* bottom_data,
++    const Dtype spatial_scale, const int channels, const int height,
++    const int width, const int pooled_height, const int pooled_width,
++    const Dtype* bottom_rois, Dtype* top_data, int* argmax_data) {
++  CUDA_KERNEL_LOOP(index, nthreads) {
++    // (n, c, ph, pw) is an element in the pooled output
++    int pw = index % pooled_width;
++    int ph = (index / pooled_width) % pooled_height;
++    int c = (index / pooled_width / pooled_height) % channels;
++    int n = index / pooled_width / pooled_height / channels;
++
++    bottom_rois += n * 5;
++    int roi_batch_ind = bottom_rois[0];
++    int roi_start_w = round(bottom_rois[1] * spatial_scale);
++    int roi_start_h = round(bottom_rois[2] * spatial_scale);
++    int roi_end_w = round(bottom_rois[3] * spatial_scale);
++    int roi_end_h = round(bottom_rois[4] * spatial_scale);
++
++    // Force malformed ROIs to be 1x1
++    int roi_width = max(roi_end_w - roi_start_w + 1, 1);
++    int roi_height = max(roi_end_h - roi_start_h + 1, 1);
++    Dtype bin_size_h = static_cast<Dtype>(roi_height)
++                       / static_cast<Dtype>(pooled_height);
++    Dtype bin_size_w = static_cast<Dtype>(roi_width)
++                       / static_cast<Dtype>(pooled_width);
++
++    int hstart = static_cast<int>(floor(static_cast<Dtype>(ph)
++                                        * bin_size_h));
++    int wstart = static_cast<int>(floor(static_cast<Dtype>(pw)
++                                        * bin_size_w));
++    int hend = static_cast<int>(ceil(static_cast<Dtype>(ph + 1)
++                                     * bin_size_h));
++    int wend = static_cast<int>(ceil(static_cast<Dtype>(pw + 1)
++                                     * bin_size_w));
++
++    // Add roi offsets and clip to input boundaries
++    hstart = min(max(hstart + roi_start_h, 0), height);
++    hend = min(max(hend + roi_start_h, 0), height);
++    wstart = min(max(wstart + roi_start_w, 0), width);
++    wend = min(max(wend + roi_start_w, 0), width);
++    bool is_empty = (hend <= hstart) || (wend <= wstart);
++
++    // Define an empty pooling region to be zero
++    Dtype maxval = is_empty ? 0 : -FLT_MAX;
++    // If nothing is pooled, argmax = -1 causes nothing to be backprop'd
++    int maxidx = -1;
++    bottom_data += (roi_batch_ind * channels + c) * height * width;
++    for (int h = hstart; h < hend; ++h) {
++      for (int w = wstart; w < wend; ++w) {
++        int bottom_index = h * width + w;
++        if (bottom_data[bottom_index] > maxval) {
++          maxval = bottom_data[bottom_index];
++          maxidx = bottom_index;
++        }
++      }
++    }
++    top_data[index] = maxval;
++    argmax_data[index] = maxidx;
++  }
++}
++
++template <typename Dtype>
++void ROIPoolingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top) {
++  const Dtype* bottom_data = bottom[0]->gpu_data();
++  const Dtype* bottom_rois = bottom[1]->gpu_data();
++  Dtype* top_data = top[0]->mutable_gpu_data();
++  int* argmax_data = max_idx_.mutable_gpu_data();
++  int count = top[0]->count();
++  // NOLINT_NEXT_LINE(whitespace/operators)
++  ROIPoolForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++      count, bottom_data, spatial_scale_, channels_, height_, width_,
++      pooled_height_, pooled_width_, bottom_rois, top_data, argmax_data);
++  CUDA_POST_KERNEL_CHECK;
++}
++
++template <typename Dtype>
++__global__ void ROIPoolBackward(const int nthreads, const Dtype* top_diff,
++    const int* argmax_data, const int num_rois, const Dtype spatial_scale,
++    const int channels, const int height, const int width,
++    const int pooled_height, const int pooled_width, Dtype* bottom_diff,
++    const Dtype* bottom_rois) {
++  CUDA_KERNEL_LOOP(index, nthreads) {
++    // (n, c, h, w) coords in bottom data
++    int w = index % width;
++    int h = (index / width) % height;
++    int c = (index / width / height) % channels;
++    int n = index / width / height / channels;
++
++    Dtype gradient = 0;
++    // Accumulate gradient over all ROIs that pooled this element
++    for (int roi_n = 0; roi_n < num_rois; ++roi_n) {
++      const Dtype* offset_bottom_rois = bottom_rois + roi_n * 5;
++      int roi_batch_ind = offset_bottom_rois[0];
++      // Skip if ROI's batch index doesn't match n
++      if (n != roi_batch_ind) {
++        continue;
++      }
++
++      int roi_start_w = round(offset_bottom_rois[1] * spatial_scale);
++      int roi_start_h = round(offset_bottom_rois[2] * spatial_scale);
++      int roi_end_w = round(offset_bottom_rois[3] * spatial_scale);
++      int roi_end_h = round(offset_bottom_rois[4] * spatial_scale);
++
++      // Skip if ROI doesn't include (h, w)
++      const bool in_roi = (w >= roi_start_w && w <= roi_end_w &&
++                           h >= roi_start_h && h <= roi_end_h);
++      if (!in_roi) {
++        continue;
++      }
++
++      int offset = (roi_n * channels + c) * pooled_height * pooled_width;
++      const Dtype* offset_top_diff = top_diff + offset;
++      const int* offset_argmax_data = argmax_data + offset;
++
++      // Compute feasible set of pooled units that could have pooled
++      // this bottom unit
++
++      // Force malformed ROIs to be 1x1
++      int roi_width = max(roi_end_w - roi_start_w + 1, 1);
++      int roi_height = max(roi_end_h - roi_start_h + 1, 1);
++
++      Dtype bin_size_h = static_cast<Dtype>(roi_height)
++                         / static_cast<Dtype>(pooled_height);
++      Dtype bin_size_w = static_cast<Dtype>(roi_width)
++                         / static_cast<Dtype>(pooled_width);
++
++      int phstart = floor(static_cast<Dtype>(h - roi_start_h) / bin_size_h);
++      int phend = ceil(static_cast<Dtype>(h - roi_start_h + 1) / bin_size_h);
++      int pwstart = floor(static_cast<Dtype>(w - roi_start_w) / bin_size_w);
++      int pwend = ceil(static_cast<Dtype>(w - roi_start_w + 1) / bin_size_w);
++
++      phstart = min(max(phstart, 0), pooled_height);
++      phend = min(max(phend, 0), pooled_height);
++      pwstart = min(max(pwstart, 0), pooled_width);
++      pwend = min(max(pwend, 0), pooled_width);
++
++      for (int ph = phstart; ph < phend; ++ph) {
++        for (int pw = pwstart; pw < pwend; ++pw) {
++          if (offset_argmax_data[ph * pooled_width + pw] == (h * width + w)) {
++            gradient += offset_top_diff[ph * pooled_width + pw];
++          }
++        }
++      }
++    }
++    bottom_diff[index] = gradient;
++  }
++}
++
++template <typename Dtype>
++void ROIPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
++      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
++  if (!propagate_down[0]) {
++    return;
++  }
++  const Dtype* bottom_rois = bottom[1]->gpu_data();
++  const Dtype* top_diff = top[0]->gpu_diff();
++  Dtype* bottom_diff = bottom[0]->mutable_gpu_diff();
++  const int count = bottom[0]->count();
++  caffe_gpu_set(count, Dtype(0.), bottom_diff);
++  const int* argmax_data = max_idx_.gpu_data();
++  // NOLINT_NEXT_LINE(whitespace/operators)
++  ROIPoolBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++      count, top_diff, argmax_data, top[0]->num(), spatial_scale_, channels_,
++      height_, width_, pooled_height_, pooled_width_, bottom_diff, bottom_rois);
++  CUDA_POST_KERNEL_CHECK;
++}
++
++INSTANTIATE_LAYER_GPU_FUNCS(ROIPoolingLayer);
++
++}  // namespace caffe
+diff --git a/src/caffe/layers/smooth_L1_loss_layer.cpp b/src/caffe/layers/smooth_L1_loss_layer.cpp
+new file mode 100644
+index 000000000..4e748368b
+--- /dev/null
++++ b/src/caffe/layers/smooth_L1_loss_layer.cpp
+@@ -0,0 +1,70 @@
++// ------------------------------------------------------------------
++// Fast R-CNN
++// Copyright (c) 2015 Microsoft
++// Licensed under The MIT License [see fast-rcnn/LICENSE for details]
++// Written by Ross Girshick
++// ------------------------------------------------------------------
++
++#include "caffe/fast_rcnn_layers.hpp"
++
++namespace caffe {
++
++template <typename Dtype>
++void SmoothL1LossLayer<Dtype>::LayerSetUp(
++  const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
++  SmoothL1LossParameter loss_param = this->layer_param_.smooth_l1_loss_param();
++  sigma2_ = loss_param.sigma() * loss_param.sigma();
++  has_weights_ = (bottom.size() >= 3);
++  if (has_weights_) {
++    CHECK_EQ(bottom.size(), 4) << "If weights are used, must specify both "
++      "inside and outside weights";
++  }
++}
++
++template <typename Dtype>
++void SmoothL1LossLayer<Dtype>::Reshape(
++  const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
++  LossLayer<Dtype>::Reshape(bottom, top);
++  CHECK_EQ(bottom[0]->channels(), bottom[1]->channels());
++  CHECK_EQ(bottom[0]->height(), bottom[1]->height());
++  CHECK_EQ(bottom[0]->width(), bottom[1]->width());
++  if (has_weights_) {
++    CHECK_EQ(bottom[0]->channels(), bottom[2]->channels());
++    CHECK_EQ(bottom[0]->height(), bottom[2]->height());
++    CHECK_EQ(bottom[0]->width(), bottom[2]->width());
++    CHECK_EQ(bottom[0]->channels(), bottom[3]->channels());
++    CHECK_EQ(bottom[0]->height(), bottom[3]->height());
++    CHECK_EQ(bottom[0]->width(), bottom[3]->width());
++  }
++  diff_.Reshape(bottom[0]->num(), bottom[0]->channels(),
++      bottom[0]->height(), bottom[0]->width());
++  errors_.Reshape(bottom[0]->num(), bottom[0]->channels(),
++      bottom[0]->height(), bottom[0]->width());
++  // vector of ones used to sum
++  ones_.Reshape(bottom[0]->num(), bottom[0]->channels(),
++      bottom[0]->height(), bottom[0]->width());
++  for (int i = 0; i < bottom[0]->count(); ++i) {
++    ones_.mutable_cpu_data()[i] = Dtype(1);
++  }
++}
++
++template <typename Dtype>
++void SmoothL1LossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
++    const vector<Blob<Dtype>*>& top) {
++  NOT_IMPLEMENTED;
++}
++
++template <typename Dtype>
++void SmoothL1LossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
++    const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
++  NOT_IMPLEMENTED;
++}
++
++#ifdef CPU_ONLY
++STUB_GPU(SmoothL1LossLayer);
++#endif
++
++INSTANTIATE_CLASS(SmoothL1LossLayer);
++REGISTER_LAYER_CLASS(SmoothL1Loss);
++
++}  // namespace caffe
+diff --git a/src/caffe/layers/smooth_L1_loss_layer.cu b/src/caffe/layers/smooth_L1_loss_layer.cu
+new file mode 100644
+index 000000000..973142233
+--- /dev/null
++++ b/src/caffe/layers/smooth_L1_loss_layer.cu
+@@ -0,0 +1,117 @@
++// ------------------------------------------------------------------
++// Fast R-CNN
++// Copyright (c) 2015 Microsoft
++// Licensed under The MIT License [see fast-rcnn/LICENSE for details]
++// Written by Ross Girshick
++// ------------------------------------------------------------------
++
++#include "caffe/fast_rcnn_layers.hpp"
++
++namespace caffe {
++
++template <typename Dtype>
++__global__ void SmoothL1Forward(const int n, const Dtype* in, Dtype* out,
++    Dtype sigma2) {
++  // f(x) = 0.5 * (sigma * x)^2          if |x| < 1 / sigma / sigma
++  //        |x| - 0.5 / sigma / sigma    otherwise
++  CUDA_KERNEL_LOOP(index, n) {
++    Dtype val = in[index];
++    Dtype abs_val = abs(val);
++    if (abs_val < 1.0 / sigma2) {
++      out[index] = 0.5 * val * val * sigma2;
++    } else {
++      out[index] = abs_val - 0.5 / sigma2;
++    }
++  }
++}
++
++template <typename Dtype>
++void SmoothL1LossLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
++    const vector<Blob<Dtype>*>& top) {
++  int count = bottom[0]->count();
++  caffe_gpu_sub(
++      count,
++      bottom[0]->gpu_data(),
++      bottom[1]->gpu_data(),
++      diff_.mutable_gpu_data());    // d := b0 - b1
++  if (has_weights_) {
++    // apply "inside" weights
++    caffe_gpu_mul(
++        count,
++        bottom[2]->gpu_data(),
++        diff_.gpu_data(),
++        diff_.mutable_gpu_data());  // d := w_in * (b0 - b1)
++  }
++  SmoothL1Forward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++      count, diff_.gpu_data(), errors_.mutable_gpu_data(), sigma2_);
++  CUDA_POST_KERNEL_CHECK;
++
++  if (has_weights_) {
++    // apply "outside" weights
++    caffe_gpu_mul(
++        count,
++        bottom[3]->gpu_data(),
++        errors_.gpu_data(),
++        errors_.mutable_gpu_data());  // d := w_out * SmoothL1(w_in * (b0 - b1))
++  }
++
++  Dtype loss;
++  caffe_gpu_dot(count, ones_.gpu_data(), errors_.gpu_data(), &loss);
++  top[0]->mutable_cpu_data()[0] = loss / bottom[0]->num();
++}
++
++template <typename Dtype>
++__global__ void SmoothL1Backward(const int n, const Dtype* in, Dtype* out,
++    Dtype sigma2) {
++  // f'(x) = sigma * sigma * x         if |x| < 1 / sigma / sigma
++  //       = sign(x)                   otherwise
++  CUDA_KERNEL_LOOP(index, n) {
++    Dtype val = in[index];
++    Dtype abs_val = abs(val);
++    if (abs_val < 1.0 / sigma2) {
++      out[index] = sigma2 * val;
++    } else {
++      out[index] = (Dtype(0) < val) - (val < Dtype(0));
++    }
++  }
++}
++
++template <typename Dtype>
++void SmoothL1LossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
++    const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
++  // after forwards, diff_ holds w_in * (b0 - b1)
++  int count = diff_.count();
++  SmoothL1Backward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++      count, diff_.gpu_data(), diff_.mutable_gpu_data(), sigma2_);
++  CUDA_POST_KERNEL_CHECK;
++  for (int i = 0; i < 2; ++i) {
++    if (propagate_down[i]) {
++      const Dtype sign = (i == 0) ? 1 : -1;
++      const Dtype alpha = sign * top[0]->cpu_diff()[0] / bottom[i]->num();
++      caffe_gpu_axpby(
++          count,                           // count
++          alpha,                           // alpha
++          diff_.gpu_data(),                // x
++          Dtype(0),                        // beta
++          bottom[i]->mutable_gpu_diff());  // y
++      if (has_weights_) {
++        // Scale by "inside" weight
++        caffe_gpu_mul(
++            count,
++            bottom[2]->gpu_data(),
++            bottom[i]->gpu_diff(),
++            bottom[i]->mutable_gpu_diff());
++        // Scale by "outside" weight
++        caffe_gpu_mul(
++            count,
++            bottom[3]->gpu_data(),
++            bottom[i]->gpu_diff(),
++            bottom[i]->mutable_gpu_diff());
++      }
++    }
++  }
++}
++
++INSTANTIATE_LAYER_GPU_FUNCS(SmoothL1LossLayer);
++
++}  // namespace caffe
+diff --git a/src/caffe/proto/caffe.proto b/src/caffe/proto/caffe.proto
+index 3dcad697f..d8f0cccab 100644
+--- a/src/caffe/proto/caffe.proto
++++ b/src/caffe/proto/caffe.proto
+@@ -411,8 +411,10 @@ message LayerParameter {
+   optional ReductionParameter reduction_param = 136;
+   optional ReLUParameter relu_param = 123;
+   optional ReshapeParameter reshape_param = 133;
++  optional ROIPoolingParameter roi_pooling_param = 8266711;
+   optional ScaleParameter scale_param = 142;
+   optional SigmoidParameter sigmoid_param = 124;
++  optional SmoothL1LossParameter smooth_l1_loss_param = 8266712;
+   optional SoftmaxParameter softmax_param = 125;
+   optional SPPParameter spp_param = 132;
+   optional SliceParameter slice_param = 126;
+@@ -696,6 +698,7 @@ message DataParameter {
+ 
+ message DropoutParameter {
+   optional float dropout_ratio = 1 [default = 0.5]; // dropout ratio
++  optional bool scale_train = 2 [default = true];  // scale train or test phase
+ }
+ 
+ // DummyDataLayer fills any number of arbitrarily shaped blobs with random
+@@ -1098,6 +1101,17 @@ message ReshapeParameter {
+   optional int32 num_axes = 3 [default = -1];
+ }
+ 
++// Message that stores parameters used by ROIPoolingLayer
++message ROIPoolingParameter {
++  // Pad, kernel size, and stride are all given as a single value for equal
++  // dimensions in height and width or as Y, X pairs.
++  optional uint32 pooled_h = 1 [default = 0]; // The pooled output height
++  optional uint32 pooled_w = 2 [default = 0]; // The pooled output width
++  // Multiplicative spatial scale factor to translate ROI coords from their
++  // input scale to the scale used when pooling
++  optional float spatial_scale = 3 [default = 1];
++}
++
+ message ScaleParameter {
+   // The first axis of bottom[0] (the first input Blob) along which to apply
+   // bottom[1] (the second input Blob).  May be negative to index from the end
+@@ -1144,6 +1158,13 @@ message SigmoidParameter {
+   optional Engine engine = 1 [default = DEFAULT];
+ }
+ 
++message SmoothL1LossParameter {
++  // SmoothL1Loss(x) =
++  //   0.5 * (sigma * x) ** 2    -- if x < 1.0 / sigma / sigma
++  //   |x| - 0.5 / sigma / sigma -- otherwise
++  optional float sigma = 1 [default = 1];
++}
++
+ message SliceParameter {
+   // The axis along which to slice -- may be negative to index from the end
+   // (e.g., -1 for the last axis).
+diff --git a/src/caffe/test/test_roi_pooling_layer.cpp b/src/caffe/test/test_roi_pooling_layer.cpp
+new file mode 100644
+index 000000000..9290bad2d
+--- /dev/null
++++ b/src/caffe/test/test_roi_pooling_layer.cpp
+@@ -0,0 +1,103 @@
++// ------------------------------------------------------------------
++// Fast R-CNN
++// Copyright (c) 2015 Microsoft
++// Licensed under The MIT License [see fast-rcnn/LICENSE for details]
++// Written by Ross Girshick
++// ------------------------------------------------------------------
++
++#include <cmath>
++#include <cstdlib>
++#include <cstring>
++#include <vector>
++
++#include "boost/scoped_ptr.hpp"
++#include "gtest/gtest.h"
++
++#include "caffe/blob.hpp"
++#include "caffe/common.hpp"
++#include "caffe/filler.hpp"
++#include "caffe/fast_rcnn_layers.hpp"
++
++#include "caffe/test/test_caffe_main.hpp"
++#include "caffe/test/test_gradient_check_util.hpp"
++
++using boost::scoped_ptr;
++
++namespace caffe {
++
++typedef ::testing::Types<GPUDevice<float>, GPUDevice<double> > TestDtypesGPU;
++
++template <typename TypeParam>
++class ROIPoolingLayerTest : public MultiDeviceTest<TypeParam> {
++  typedef typename TypeParam::Dtype Dtype;
++
++ protected:
++  ROIPoolingLayerTest()
++      : blob_bottom_data_(new Blob<Dtype>(4, 3, 12, 8)),
++        blob_bottom_rois_(new Blob<Dtype>(4, 5, 1, 1)),
++        blob_top_data_(new Blob<Dtype>()) {
++    // fill the values
++    FillerParameter filler_param;
++    filler_param.set_std(10);
++    GaussianFiller<Dtype> filler(filler_param);
++    filler.Fill(this->blob_bottom_data_);
++    //for (int i = 0; i < blob_bottom_data_->count(); ++i) {
++    //  blob_bottom_data_->mutable_cpu_data()[i] = i;
++    //}
++    blob_bottom_vec_.push_back(blob_bottom_data_);
++    int i = 0;
++    blob_bottom_rois_->mutable_cpu_data()[0 + 5*i] = 0; //caffe_rng_rand() % 4;
++    blob_bottom_rois_->mutable_cpu_data()[1 + 5*i] = 1; // x1 < 8
++    blob_bottom_rois_->mutable_cpu_data()[2 + 5*i] = 1; // y1 < 12
++    blob_bottom_rois_->mutable_cpu_data()[3 + 5*i] = 6; // x2 < 8
++    blob_bottom_rois_->mutable_cpu_data()[4 + 5*i] = 6; // y2 < 12
++    i = 1;
++    blob_bottom_rois_->mutable_cpu_data()[0 + 5*i] = 2;
++    blob_bottom_rois_->mutable_cpu_data()[1 + 5*i] = 6; // x1 < 8
++    blob_bottom_rois_->mutable_cpu_data()[2 + 5*i] = 2; // y1 < 12
++    blob_bottom_rois_->mutable_cpu_data()[3 + 5*i] = 7; // x2 < 8
++    blob_bottom_rois_->mutable_cpu_data()[4 + 5*i] = 11; // y2 < 12
++    i = 2;
++    blob_bottom_rois_->mutable_cpu_data()[0 + 5*i] = 1;
++    blob_bottom_rois_->mutable_cpu_data()[1 + 5*i] = 3; // x1 < 8
++    blob_bottom_rois_->mutable_cpu_data()[2 + 5*i] = 1; // y1 < 12
++    blob_bottom_rois_->mutable_cpu_data()[3 + 5*i] = 5; // x2 < 8
++    blob_bottom_rois_->mutable_cpu_data()[4 + 5*i] = 10; // y2 < 12
++    i = 3;
++    blob_bottom_rois_->mutable_cpu_data()[0 + 5*i] = 0;
++    blob_bottom_rois_->mutable_cpu_data()[1 + 5*i] = 3; // x1 < 8
++    blob_bottom_rois_->mutable_cpu_data()[2 + 5*i] = 3; // y1 < 12
++    blob_bottom_rois_->mutable_cpu_data()[3 + 5*i] = 3; // x2 < 8
++    blob_bottom_rois_->mutable_cpu_data()[4 + 5*i] = 3; // y2 < 12
++
++    blob_bottom_vec_.push_back(blob_bottom_rois_);
++    blob_top_vec_.push_back(blob_top_data_);
++  }
++  virtual ~ROIPoolingLayerTest() {
++    delete blob_bottom_data_;
++    delete blob_bottom_rois_;
++    delete blob_top_data_;
++  }
++  Blob<Dtype>* const blob_bottom_data_;
++  Blob<Dtype>* const blob_bottom_rois_;
++  Blob<Dtype>* const blob_top_data_;
++  vector<Blob<Dtype>*> blob_bottom_vec_;
++  vector<Blob<Dtype>*> blob_top_vec_;
++};
++
++TYPED_TEST_CASE(ROIPoolingLayerTest, TestDtypesGPU);
++
++TYPED_TEST(ROIPoolingLayerTest, TestGradient) {
++  typedef typename TypeParam::Dtype Dtype;
++  LayerParameter layer_param;
++  ROIPoolingParameter* roi_pooling_param =
++      layer_param.mutable_roi_pooling_param();
++  roi_pooling_param->set_pooled_h(6);
++  roi_pooling_param->set_pooled_w(6);
++  ROIPoolingLayer<Dtype> layer(layer_param);
++  GradientChecker<Dtype> checker(1e-4, 1e-2);
++  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
++      this->blob_top_vec_, 0);
++}
++
++}  // namespace caffe
+diff --git a/src/caffe/test/test_smooth_L1_loss_layer.cpp b/src/caffe/test/test_smooth_L1_loss_layer.cpp
+new file mode 100644
+index 000000000..e5bc2bf24
+--- /dev/null
++++ b/src/caffe/test/test_smooth_L1_loss_layer.cpp
+@@ -0,0 +1,90 @@
++#include <cmath>
++#include <cstdlib>
++#include <cstring>
++#include <vector>
++
++#include "gtest/gtest.h"
++
++#include "caffe/blob.hpp"
++#include "caffe/common.hpp"
++#include "caffe/filler.hpp"
++#include "caffe/vision_layers.hpp"
++#include "caffe/fast_rcnn_layers.hpp"
++
++#include "caffe/test/test_caffe_main.hpp"
++#include "caffe/test/test_gradient_check_util.hpp"
++
++namespace caffe {
++
++typedef ::testing::Types<GPUDevice<float>, GPUDevice<double> > TestDtypesGPU;
++
++template <typename TypeParam>
++class SmoothL1LossLayerTest : public MultiDeviceTest<TypeParam> {
++  typedef typename TypeParam::Dtype Dtype;
++
++ protected:
++  SmoothL1LossLayerTest()
++      : blob_bottom_data_(new Blob<Dtype>(10, 5, 1, 1)),
++        blob_bottom_label_(new Blob<Dtype>(10, 5, 1, 1)),
++        blob_bottom_inside_weights_(new Blob<Dtype>(10, 5, 1, 1)),
++        blob_bottom_outside_weights_(new Blob<Dtype>(10, 5, 1, 1)),
++        blob_top_loss_(new Blob<Dtype>()) {
++    // fill the values
++    FillerParameter const_filler_param;
++    const_filler_param.set_value(-1.);
++    ConstantFiller<Dtype> const_filler(const_filler_param);
++    FillerParameter filler_param;
++    GaussianFiller<Dtype> filler(filler_param);
++
++    filler.Fill(this->blob_bottom_data_);
++    blob_bottom_vec_.push_back(blob_bottom_data_);
++    filler.Fill(this->blob_bottom_label_);
++    blob_bottom_vec_.push_back(blob_bottom_label_);
++
++    //const_filler.Fill(this->blob_bottom_inside_weights_);
++    filler.Fill(this->blob_bottom_inside_weights_);
++    blob_bottom_vec_.push_back(blob_bottom_inside_weights_);
++    //const_filler.Fill(this->blob_bottom_outside_weights_);
++    filler.Fill(this->blob_bottom_outside_weights_);
++    blob_bottom_vec_.push_back(blob_bottom_outside_weights_);
++
++    blob_top_vec_.push_back(blob_top_loss_);
++  }
++  virtual ~SmoothL1LossLayerTest() {
++    delete blob_bottom_data_;
++    delete blob_bottom_label_;
++    delete blob_bottom_inside_weights_;
++    delete blob_bottom_outside_weights_;
++    delete blob_top_loss_;
++  }
++
++  Blob<Dtype>* const blob_bottom_data_;
++  Blob<Dtype>* const blob_bottom_label_;
++  Blob<Dtype>* const blob_bottom_inside_weights_;
++  Blob<Dtype>* const blob_bottom_outside_weights_;
++  Blob<Dtype>* const blob_top_loss_;
++  vector<Blob<Dtype>*> blob_bottom_vec_;
++  vector<Blob<Dtype>*> blob_top_vec_;
++};
++
++TYPED_TEST_CASE(SmoothL1LossLayerTest, TestDtypesGPU);
++
++TYPED_TEST(SmoothL1LossLayerTest, TestGradient) {
++  typedef typename TypeParam::Dtype Dtype;
++  LayerParameter layer_param;
++  SmoothL1LossParameter* loss_param =
++      layer_param.mutable_smooth_l1_loss_param();
++  loss_param->set_sigma(2.4);
++
++  const Dtype kLossWeight = 3.7;
++  layer_param.add_loss_weight(kLossWeight);
++  SmoothL1LossLayer<Dtype> layer(layer_param);
++  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
++  GradientChecker<Dtype> checker(1e-2, 1e-2, 1701);
++  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
++      this->blob_top_vec_, 0);
++  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
++      this->blob_top_vec_, 1);
++}
++
++}  // namespace caffe
